@@ -1,46 +1,60 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html>
 <head>
-  <meta charset="UTF-8" />
-  <title>Click Simples</title>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <title>Jogo do Clique</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
   <style>
     body {
       background-color: white;
       font-family: sans-serif;
       text-align: center;
       margin: 0;
-      padding: 0;
     }
     #contador {
-      font-size: 4em;
-      margin-top: 100px;
-    }
-    #ranking-box {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      text-align: left;
+      font-size: 48px;
+      margin-top: 20px;
     }
     #ranking {
-      list-style: none;
-      padding: 0;
-      margin-top: 5px;
+      margin-top: 40px;
+    }
+    #admin {
+      margin-top: 30px;
+      display: none; /* só aparece se for o dev */
+    }
+    .vencedor {
+      background-color: white;
+      color: red;
+      font-size: 40px;
+      position: fixed;
+      top: 40%;
+      left: 50%;
+      transform: translate(-50%, -50%);
     }
   </style>
 </head>
 <body>
-  <div id="ranking-box">
-    <div style="display: flex; justify-content: space-between; align-items: center;">
-      <strong>Ranking:</strong>
-      <button onclick="definirConta()">Colocar nome</button>
-    </div>
-    <ul id="ranking"></ul>
-  </div>
-  <div id="contador">0</div>
 
-  <script>
+<h1 id="titulo">Clique em qualquer lugar!</h1>
+<div id="contador">0</div>
+
+<div id="ranking">
+  <h2>Ranking</h2>
+  <ul id="ranking-list"></ul>
+</div>
+
+<button onclick="pedirNome()">Colocar nome</button>
+
+<div id="admin">
+  <h2>Área do Dev</h2>
+  <button onclick="presentear()">🎁 Presentear fundo 'vencedor'</button>
+  <button onclick="sortear()">🎲 Sortear fundo 'vencedor'</button>
+  <button onclick="definirADM()">👑 Definir ADM</button>
+</div>
+
+<div id="fundo-vencedor" class="vencedor" style="display: none;">VENCEDOR</div>
+
+<script>
 const firebaseConfig = {
   apiKey: "AIzaSyA5PBsLbfCNrbHcjJKlcys-v-A07K5dQ6M",
   authDomain: "click-1657a.firebaseapp.com",
@@ -50,98 +64,103 @@ const firebaseConfig = {
   messagingSenderId: "727136328218",
   appId: "1:727136328218:web:d91ea1d01d51e416ba4fa3"
 };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+  
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-    // Variáveis
-    const contadorEl = document.getElementById('contador');
-    const rankingEl = document.getElementById('ranking');
-    let contagem = 0;
-    let nick = localStorage.getItem('nick');
-    let senha = localStorage.getItem('senha');
+  let nick = localStorage.getItem("nick") || "";
+  let senha = localStorage.getItem("senha") || "";
+  let cliques = 0;
 
-    // Clique
-    document.body.addEventListener('click', () => {
-      if (!nick || !senha) return alert("Clique em 'Colocar nome' para começar");
-      contagem++;
-      contadorEl.textContent = contagem;
-    });
+  function pedirNome() {
+    nick = prompt("Digite seu nome:");
+    senha = prompt("Digite uma senha:");
+    localStorage.setItem("nick", nick);
+    localStorage.setItem("senha", senha);
 
-    // Salva no Firebase ao sair
-    window.addEventListener('beforeunload', () => {
-      if (nick && senha) salvarRanking(nick, contagem);
-    });
-
-    // Atualiza ranking a cada segundo
-    setInterval(carregarRanking, 1000);
-
-    function salvarRanking(nick, cliques) {
-      db.ref('ranking/' + nick).set({ cliques, senha });
-    }
-
-    function carregarRanking() {
-      db.ref('ranking').once('value').then(snapshot => {
-        const data = snapshot.val();
-        const lista = [];
-
-        for (let nome in data) {
-          lista.push({ nome, cliques: data[nome].cliques || 0 });
-        }
-
-        lista.sort((a, b) => b.cliques - a.cliques);
-        rankingEl.innerHTML = lista.slice(0, 10).map(entry =>
-          `<li>${entry.nome}: ${entry.cliques}</li>`
-        ).join('');
-      });
-    }
-
-    function definirConta() {
-      const nome = prompt("Digite seu nome:");
-      const senhaDigitada = prompt("Digite sua senha:");
-
-      if (!nome || !senhaDigitada) return;
-
-      db.ref('ranking/' + nome).once('value').then(snapshot => {
-        if (snapshot.exists()) {
-          const dados = snapshot.val();
-          if (dados.senha !== senhaDigitada) {
-            alert("Senha incorreta! Tente novamente.");
-          } else {
-            nick = nome;
-            senha = senhaDigitada;
-            localStorage.setItem('nick', nick);
-            localStorage.setItem('senha', senha);
-            contagem = dados.cliques || 0;
-            contadorEl.textContent = contagem;
-            alert(`Bem-vindo de volta, ${nick}`);
-          }
+    db.ref("ranking/" + nick).once("value").then(snap => {
+      if (snap.exists()) {
+        if (snap.val().senha === senha) {
+          cliques = snap.val().cliques || 0;
         } else {
-          // Novo usuário
-          nick = nome;
-          senha = senhaDigitada;
-          localStorage.setItem('nick', nick);
-          localStorage.setItem('senha', senha);
-          db.ref('ranking/' + nick).set({ cliques: 0, senha: senha });
-          contagem = 0;
-          contadorEl.textContent = contagem;
-          alert(`Conta criada para ${nick}`);
+          alert("Senha incorreta!");
+          nick = "";
+          senha = "";
+          localStorage.clear();
         }
-      });
-    }
+      } else {
+        db.ref("ranking/" + nick).set({ cliques: 0, senha });
+      }
 
-    // Carrega progresso ao abrir
-    if (nick && senha) {
-      db.ref('ranking/' + nick).once('value').then(snapshot => {
-        if (snapshot.exists() && snapshot.val().senha === senha) {
-          contagem = snapshot.val().cliques || 0;
-          contadorEl.textContent = contagem;
-        } else {
-          alert("Senha salva está incorreta. Clique em 'Colocar nome' para refazer.");
-          localStorage.removeItem('nick');
-          localStorage.removeItem('senha');
+      if (nick === "raul desenvolvedor") {
+        document.getElementById("admin").style.display = "block";
+      }
+    });
+  }
+
+  if (nick && senha) {
+    db.ref("ranking/" + nick).once("value").then(snap => {
+      if (snap.exists() && snap.val().senha === senha) {
+        cliques = snap.val().cliques || 0;
+        if (snap.val().fundo === "vencedor") {
+          document.getElementById("fundo-vencedor").style.display = "block";
         }
-      });
-    }
-  </script>
+        if (nick === "SeuNomeDev") {
+          document.getElementById("admin").style.display = "block";
+        }
+      } else {
+        localStorage.clear();
+      }
+    });
+  }
+
+  document.body.onclick = () => {
+    if (!nick) return;
+    cliques++;
+    document.getElementById("contador").innerText = cliques;
+    db.ref("ranking/" + nick).update({ cliques });
+  };
+
+  setInterval(() => {
+    db.ref("ranking").once("value").then(snapshot => {
+      const data = snapshot.val();
+      const rankingList = document.getElementById("ranking-list");
+      rankingList.innerHTML = "";
+      const sorted = Object.entries(data || {}).sort((a, b) => (b[1].cliques || 0) - (a[1].cliques || 0));
+      for (const [nome, info] of sorted) {
+        const li = document.createElement("li");
+        li.innerText = `${nome} - ${info.cliques || 0} cliques ${info.titulo ? "(" + info.titulo + ")" : ""}`;
+        rankingList.appendChild(li);
+      }
+    });
+  }, 1000);
+
+  function presentear() {
+    const alvo = prompt("Nome do jogador a presentear:");
+    if (!alvo) return;
+    db.ref("ranking/" + alvo).update({ fundo: "vencedor" });
+    alert(alvo + " recebeu o fundo 'vencedor'!");
+  }
+
+  function sortear() {
+    db.ref("ranking").once("value").then(snapshot => {
+      const data = snapshot.val();
+      const nomes = Object.keys(data || {});
+      if (nomes.length === 0) return alert("Ninguém pra sortear!");
+      const sorteado = nomes[Math.floor(Math.random() * nomes.length)];
+      db.ref("ranking/" + sorteado).update({ fundo: "vencedor" });
+      alert("Sorteado: " + sorteado + " recebeu o fundo 'vencedor'!");
+    });
+  }
+
+  function definirADM() {
+    const alvo = prompt("Nome do jogador que será dev:");
+    if (!alvo) return;
+    db.ref("ranking/" + alvo).update({ titulo: "Dev" });
+    alert(alvo + " agora é DEV!");
+  }
+</script>
+
 </body>
 </html>
+
