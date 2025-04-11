@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <title>Click Simples</title>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+  <style>
+    body {
+      background-color: white;
+      font-family: sans-serif;
+      text-align: center;
+      margin: 0;
+      padding: 0;
+    }
+    #contador {
+      font-size: 4em;
+      margin-top: 100px;
+    }
+    #ranking-box {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      text-align: left;
+    }
+    #ranking {
+      list-style: none;
+      padding: 0;
+      margin-top: 5px;
+    }
+  </style>
+</head>
+<body>
+  <div id="ranking-box">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <strong>Ranking:</strong>
+      <button onclick="definirConta()">Colocar nome</button>
+    </div>
+    <ul id="ranking"></ul>
+  </div>
+  <div id="contador">0</div>
+
+  <script>
+const firebaseConfig = {
+  apiKey: "AIzaSyA5PBsLbfCNrbHcjJKlcys-v-A07K5dQ6M",
+  authDomain: "click-1657a.firebaseapp.com",
+  databaseURL: "https://click-1657a-default-rtdb.firebaseio.com",
+  projectId: "click-1657a",
+  storageBucket: "click-1657a.firebasestorage.app",
+  messagingSenderId: "727136328218",
+  appId: "1:727136328218:web:d91ea1d01d51e416ba4fa3"
+};
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.database();
+
+    // Variáveis
+    const contadorEl = document.getElementById('contador');
+    const rankingEl = document.getElementById('ranking');
+    let contagem = 0;
+    let nick = localStorage.getItem('nick');
+    let senha = localStorage.getItem('senha');
+
+    // Clique
+    document.body.addEventListener('click', () => {
+      if (!nick || !senha) return alert("Clique em 'Colocar nome' para começar");
+      contagem++;
+      contadorEl.textContent = contagem;
+    });
+
+    // Salva no Firebase ao sair
+    window.addEventListener('beforeunload', () => {
+      if (nick && senha) salvarRanking(nick, contagem);
+    });
+
+    // Atualiza ranking a cada segundo
+    setInterval(carregarRanking, 1000);
+
+    function salvarRanking(nick, cliques) {
+      db.ref('ranking/' + nick).set({ cliques, senha });
+    }
+
+    function carregarRanking() {
+      db.ref('ranking').once('value').then(snapshot => {
+        const data = snapshot.val();
+        const lista = [];
+
+        for (let nome in data) {
+          lista.push({ nome, cliques: data[nome].cliques || 0 });
+        }
+
+        lista.sort((a, b) => b.cliques - a.cliques);
+        rankingEl.innerHTML = lista.slice(0, 10).map(entry =>
+          `<li>${entry.nome}: ${entry.cliques}</li>`
+        ).join('');
+      });
+    }
+
+    function definirConta() {
+      const nome = prompt("Digite seu nome:");
+      const senhaDigitada = prompt("Digite sua senha:");
+
+      if (!nome || !senhaDigitada) return;
+
+      db.ref('ranking/' + nome).once('value').then(snapshot => {
+        if (snapshot.exists()) {
+          const dados = snapshot.val();
+          if (dados.senha !== senhaDigitada) {
+            alert("Senha incorreta! Tente novamente.");
+          } else {
+            nick = nome;
+            senha = senhaDigitada;
+            localStorage.setItem('nick', nick);
+            localStorage.setItem('senha', senha);
+            contagem = dados.cliques || 0;
+            contadorEl.textContent = contagem;
+            alert(`Bem-vindo de volta, ${nick}`);
+          }
+        } else {
+          // Novo usuário
+          nick = nome;
+          senha = senhaDigitada;
+          localStorage.setItem('nick', nick);
+          localStorage.setItem('senha', senha);
+          db.ref('ranking/' + nick).set({ cliques: 0, senha: senha });
+          contagem = 0;
+          contadorEl.textContent = contagem;
+          alert(`Conta criada para ${nick}`);
+        }
+      });
+    }
+
+    // Carrega progresso ao abrir
+    if (nick && senha) {
+      db.ref('ranking/' + nick).once('value').then(snapshot => {
+        if (snapshot.exists() && snapshot.val().senha === senha) {
+          contagem = snapshot.val().cliques || 0;
+          contadorEl.textContent = contagem;
+        } else {
+          alert("Senha salva está incorreta. Clique em 'Colocar nome' para refazer.");
+          localStorage.removeItem('nick');
+          localStorage.removeItem('senha');
+        }
+      });
+    }
+  </script>
+</body>
+</html>
